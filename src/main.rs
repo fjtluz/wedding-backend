@@ -4,14 +4,42 @@ mod models;
 use diesel::{dsl::sql, prelude::*, sql_types::{Bool, Text}};
 use dotenvy::dotenv;
 use models::{Confirmacao, Convidados};
-use rocket::{launch, post, response, routes, serde::{self, json::Json}, Responder};
+use rocket::{fairing::{Fairing, Info, Kind}, http::Header, launch, options, post, request, routes, serde::{self, json::Json}, Request, Responder};
 use std::env;
+
+struct Cors;
+
+#[rocket::async_trait]
+impl Fairing for Cors {
+    fn info(&self) -> Info {
+        Info {
+            name: "Cross-Origin Resource Sharing (CORS)",
+            kind: Kind::Response
+        }
+    }
+
+    async fn on_response<'r>(&self, request: &'r Request<'_>, response: &mut rocket::Response<'r>) {
+        let is_preflight = request.method() == rocket::http::Method::Options;
+
+        response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Methos", "POST, OPTIONS"));
+        response.set_header(Header::new("Access-Control-Allow-Headers", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
+
+        if is_preflight {
+            response.set_status(rocket::http::Status::Ok);
+        }
+    }
+}
 
 #[launch]
 fn rocket() -> _ {
     dotenv().ok();
 
-    rocket::build().mount("/", routes![handle_confirmation])
+
+    rocket::build()
+        .mount("/", routes![handle_confirmation, confirmation_options])
+        .attach(Cors)
 }
 
 #[derive(serde::Deserialize)]
@@ -29,6 +57,11 @@ enum Response {
     NotFound(String),
     #[response(status = 500, content_type = "json")]
     Unexpected(String)
+}
+
+#[options("/confirmation")]
+fn confirmation_options() -> &'static str {
+    ""
 }
 
 #[post("/confirmation", data = "<confirmation>")]
@@ -73,7 +106,13 @@ fn persist_confirmation(guest_id: i32, will_attend: bool) -> Result<usize, diese
         estara_presente: will_attend
     };
 
-    diesel::insert_into(confirmacao::table)
-        .values(&confirmation)
-        .execute(connection)
+    let entry_exists = confirmacao::dsl::confirmacao.find(guest_id).first::<models::Confirmacao>(connection);
+    match entry_exists {
+        Ok(_) => diesel::update(confirmacao::dsl::confirmacao.find(guest_id))
+            .set(self::schema::confirmacao::dsl::estara_presente.eq(will_attend))
+            .execute(connection),
+        Err(_) => diesel::insert_into(confirmacao::table)
+            .values(&confirmation)
+            .execute(connection)
+    }
 }

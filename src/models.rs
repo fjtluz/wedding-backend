@@ -8,7 +8,7 @@ pub struct Convidados {
     pub name: String
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::confirmacao)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Confirmacao {
