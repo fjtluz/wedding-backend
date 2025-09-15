@@ -73,6 +73,8 @@ fn handle_confirmation(confirmation: Json<ConfirmationInput>) -> Response {
         }
     } 
 
+    println!("Convidado não encontrado, guest_name = '{}'", confirmation.guest_name);
+
     Response::NotFound(String::from("{ \"response\": \"Não foi encontrado nenhum convidado com este nome!\"  }")) 
 }
 
@@ -87,10 +89,11 @@ fn is_guest_invited(guest_name: &String) -> Option<Convidados> {
 
     let connection = &mut establish_connection();
 
-    let guest_name_upper = guest_name.to_uppercase();
+    let guest_name = guest_name.to_uppercase();
+    let guest_name = guest_name.trim();
 
     return convidados
-        .filter(sql::<Bool>("UPPER(name) = ").bind::<Text, _>(guest_name_upper))
+        .filter(sql::<Bool>("UPPER(name) = ").bind::<Text, _>(guest_name))
         .select(Convidados::as_select())
         .first(connection)
         .ok();
