@@ -21,4 +21,4 @@ jobs:
     - uses: actions/upload-artifact@v4.6.2
       with:
         name: artifact
-        path: ./target/debug
+        path: ./target/debug/wedding-backend
